@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Google Fonts Link For Icons -->
+<link rel="stylesheet" href="./css/materialicon.css" />
+<link rel="stylesheet" href="./css/minifiedFirst.css" />
+<link rel="stylesheet" href="./css/minifiedSecond.css" />
+<link rel="stylesheet" href="./main.css">
+</head>
+
+<body>
+<button class="chatbot-toggler">
+  <span class="material-symbols-rounded">mode_comment</span>
+  <span class="material-symbols-outlined">close</span>
+    </button>
+    <div class="chatbot">
+        <div class="resizer top"></div>
+        <div class="resizer left"></div>
+    <header>
+    <h4>CISCO API Assistant</h4>
+    <div class="icon-container">
+    
+    <span class="collapse-icon material-icons-outlined">fullscreen</span>
+    <span class="expand-icon material-icons-outlined hide">fullscreen_exit</span>
+    </div>
+    </header>
+    <ul class="chatbox">
+      <li class="chat incoming">
+        <div class="initial-chat">
+            <span class="material-symbols-outlined">smart_toy</span>
+            <p>Hi there 👋<br>How can I help you today?</p>
+        </div>
+        <div class="icon-container">
+            <div class="copy-btn-container">
+               
+            </div>
+        </div>
+    </li>
+    </ul>
+    <div class="chat-input">
+    <textarea id="uniqueQuestion" placeholder="Enter a message..." spellcheck="false" required></textarea>
+    <span id="send-btn" class="material-symbols-rounded">send</span>
+    </div>
+    </div>
+  <script>
+      const chatbotToggler = document.querySelector(".chatbot-toggler");
+        const chatbot = document.querySelector(".chatbot");
+        const chatbox = document.querySelector(".chatbox");
+        const chatInput = document.querySelector(".chat-input textarea");
+        const sendChatBtn = document.querySelector(".chat-input span");
+        const expandIcon = document.querySelector(".expand-icon");
+        const collapseIcon = document.querySelector(".collapse-icon");
+
+        let userMessage = null; // Variable to store user's message
+        const inputInitHeight = chatInput.scrollHeight;
+
+        const createChatLi = (message, className, isResponse = false) => {
+            // Create a chat <li> element with passed message and className
+            const chatLi = document.createElement("li");
+            chatLi.classList.add("chat", className);
+
+            // Create initial-chat div
+            const initialChatDiv = document.createElement("div");
+            initialChatDiv.classList.add("initial-chat");
+
+            // Create icon and p elements for initial chat
+            if (className === "incoming") {
+                const iconSpan = document.createElement("span");
+                iconSpan.classList.add("material-symbols-outlined");
+                iconSpan.textContent = "smart_toy";
+                initialChatDiv.appendChild(iconSpan);
+            }
+
+            const pElement = document.createElement("p");
+            initialChatDiv.appendChild(pElement);
+            chatLi.appendChild(initialChatDiv);
+
+            // Add icon-container div for incoming messages (API responses)
+            if (className === "incoming" && isResponse) {
+                const iconContainer = document.createElement("div");
+                iconContainer.classList.add("icon-container");
+                chatLi.appendChild(iconContainer);
+            }
+
+            pElement.innerHTML = message;
+            return chatLi; // return chat <li> element
+        }
+
+        const createTypingIndicator = () => {
+            const typingIndicator = document.createElement("div");
+            typingIndicator.classList.add("typing-indicator");
+            typingIndicator.innerHTML = `<span></span><span></span><span></span>`;
+            return typingIndicator;
+        }
+
+        const parseAndFormatMessage = (message) => {
+            // Replace text between ** with bolded text
+            return message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        }
+
+        const generateResponse = (chatElement) => {
+            const API_URL = "/software/csws/apidoc/v1/query";
+            const messageElement = chatElement.querySelector("p");
+
+            // Define the properties and message for the API request
+            const requestOptions = {
+                method: "POST",
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query: userMessage
+                })
+            }
+
+            // Send POST request to API, get response and set the response as paragraph text
+            fetch(API_URL, requestOptions).then(res => res.json()).then(data => {
+                let responseMessage = data.message.trim();
+                responseMessage = parseAndFormatMessage(responseMessage);
+                simulateTypingEffect(messageElement, responseMessage, chatElement);
+            }).catch(() => {
+                const errorMessage = "**Oops!** Something went wrong.";
+                const formattedErrorMessage = parseAndFormatMessage(errorMessage);
+                messageElement.classList.add("error");
+                simulateTypingEffect(messageElement, formattedErrorMessage, chatElement);
+            }).finally(() => chatbox.scrollTo(0, chatbox.scrollHeight));
+        }
+
+        const simulateTypingEffect = (element, message, chatElement) => {
+            element.innerHTML = ''; // Clear previous content
+            let i = 0;
+            const typingSpeed = 10; // Adjust typing speed (in milliseconds)
+
+            const typeCharacter = () => {
+                if (i < message.length) {
+                    if (message.slice(i, i + 8) === "<strong>") {
+                        // Handle opening strong tag
+                        const endIndex = message.indexOf("</strong>", i);
+                        element.innerHTML += message.slice(i, endIndex + 9);
+                        i = endIndex + 9;
+                    } else {
+                        // Handle regular characters
+                        element.innerHTML += message.charAt(i);
+                        i++;
+                    }
+                    setTimeout(typeCharacter, typingSpeed);
+                } else {
+                    // Show the copy button container after typing effect is done
+                    const copyBtnContainer = chatElement.querySelector(".icon-container");
+                    const copyBtn = document.createElement("button");
+                    copyBtn.classList.add("copy-btn", "material-icons-outlined");
+                    copyBtn.textContent = "content_copy";
+                    const copyBtnText = document.createElement("span");
+                    copyBtnText.classList.add("copy-btn-text");
+                    copyBtnText.textContent = "Copy text";
+                    const copyBtnContainerDiv = document.createElement("div");
+                    copyBtnContainerDiv.classList.add("copy-btn-container");
+                    copyBtnContainerDiv.appendChild(copyBtn);
+                    copyBtnContainerDiv.appendChild(copyBtnText);
+                    copyBtnContainer.appendChild(copyBtnContainerDiv);
+                    addCopyFunctionality(copyBtn, element.innerText, copyBtnText);
+                }
+            }
+
+            typeCharacter();
+        }
+
+        const addCopyFunctionality = (copyButton, message, copyBtnText) => {
+            copyButton.addEventListener("click", () => {
+                navigator.clipboard.writeText(message).then(() => {
+                    copyButton.innerHTML = "check";
+                    copyBtnText.textContent = "Copied";
+                    setTimeout(() => {
+                        copyButton.innerHTML = "content_copy";
+                        copyBtnText.textContent = "Copy text";
+                    }, 2000);
+                }).catch(err => {
+                    console.error("Failed to copy text: ", err);
+                });
+            });
+        }
+        chatInput.addEventListener("input", () => {
+            // Adjust the height of the input textarea based on its content
+            chatInput.style.height = `${inputInitHeight}px`;
+            chatInput.style.height = `${chatInput.scrollHeight}px`;
+        });
+
+        chatInput.addEventListener("keydown", (e) => {
+            // If Enter key is pressed without Shift key and the window width is greater than 800px
+            if (e.key === "Enter" && !e.shiftKey ) {
+                e.preventDefault();
+                sendChatBtn.click();
+            }
+        });
+
+        sendChatBtn.addEventListener("click", () => {
+            // User message
+            userMessage = chatInput.value.trim();
+            if (!userMessage) return;
+
+            // Clear the input textarea
+            chatInput.value = "";
+            chatInput.style.height = `${inputInitHeight}px`;
+
+            // Append the user's message to the chatbox
+            chatbox.appendChild(createChatLi(userMessage, "outgoing"));
+            chatbox.scrollTo(0, chatbox.scrollHeight);
+
+            // Display typing indicator
+            const typingIndicator = createTypingIndicator();
+            chatbox.appendChild(typingIndicator);
+            chatbox.scrollTo(0, chatbox.scrollHeight);
+
+            // Generate response and remove typing indicator
+            setTimeout(() => {
+                chatbox.removeChild(typingIndicator);
+                const incomingChatLi = createChatLi("Thinking...", "incoming", true);
+                chatbox.appendChild(incomingChatLi);
+                chatbox.scrollTo(0, chatbox.scrollHeight);
+                generateResponse(incomingChatLi);
+            }, 1000);
+        });
+
+        let flager = true;
+        chatbotToggler.addEventListener("click", () => {
+            flager = !flager;
+            resetToOriginalSize();
+            document.body.classList.toggle("show-chatbot");
+            const rect=chatbot.getBoundingClientRect();
+            window.parent.postMessage({ sizeFlags: !flager ,width:rect.width,height:rect.height}, '*');
+
+            chatbot.classList.remove("maximized");
+            expandIcon.classList.add("hide");
+            collapseIcon.classList.remove("hide");
+
+            if(chatbot.classList.contains('show-chatbot')){
+                resetToOriginalSize();
+            }
+        });
+
+        expandIcon.addEventListener("click", () => { 
+            resetToOriginalSize();
+            chatbot.classList.remove("maximized");
+            expandIcon.classList.add("hide");
+            collapseIcon.classList.remove("hide");
+            const rect=chatbot.getBoundingClientRect();
+            window.parent.postMessage({ expandWidth: "toggle-width",sizeFlags: true,width:rect.width,height:rect.height}, '*');
+           
+        });
+
+        collapseIcon.addEventListener("click", () => {
+            resetToOriginalSize();
+            chatbot.classList.add("maximized");
+            expandIcon.classList.remove("hide");
+            collapseIcon.classList.add("hide");
+            const rect=chatbot.getBoundingClientRect();
+            window.parent.postMessage({ expandWidth: "full-width",sizeFlags: true,width:rect.width,height:rect.height }, '*');
+            
+        });
+
+        // Initially hide the collapse icon
+        collapseIcon.classList.add("hide");
+
+        let isMaximized = false;
+    const initialWidth = 580;
+    const initialHeight = 420;
+
+    // Resizer functionality setup
+    const resizers = document.querySelectorAll('.resizer');
+    if (resizers) {
+        resizers.forEach(resizer => {
+            handleResize(resizer);
+        });
+    } else {
+        console.error('Resizers not found. Please check the resizer class in your HTML.');
+    }
+
+    // Function to handle resizing
+    function handleResize(resizer) {
+        resizer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+
+            const initialWidth = chatbot.offsetWidth;
+            const initialHeight = chatbot.offsetHeight;
+            const initialX = e.clientX;
+            const initialY = e.clientY;
+            const initialLeft = chatbot.getBoundingClientRect().left;
+            const minWidth = 580; // Minimum width in pixels
+            const minHeight = 400; // Minimum height in pixels
+
+            chatbot.style.position = 'absolute';
+
+            if (isMaximized) {
+                chatbot.classList.remove('maximized');
+                isMaximized = false;
+            }
+
+            document.addEventListener('mousemove', resize);
+            document.addEventListener('mouseup', stopResize);
+
+            function resize(event) {
+                let newWidth, newHeight;
+
+                if (resizer.classList.contains('left')) {
+                        chatbot.classList.remove('maximized');
+                        chatbot.style.width=`940px`;
+                        chatbot.style.rigth=`370px`;
+                        // Resizing from the left
+                        const newWidth = initialWidth - (event.clientX - initialX);
+                        if (newWidth >= minWidth) {
+                            chatbot.style.width = `${newWidth}px`;
+                            //chatbot.style.left = `${initialLeft + (event.clientX - initialX)}px`;
+                        }
+                    } else if (resizer.classList.contains('top')) {
+                        // Resizing from the top
+                        const newHeight = initialHeight - (event.clientY - initialY);
+                        if (newHeight >= minHeight) {
+                            chatbot.style.height = `${newHeight}px`;
+                            chatbox.style.height=`${newHeight-30}px`
+                        }
+                    }
+
+                // Send the live width and height of chatbox
+                sendLiveDimensions(chatbot.offsetWidth, chatbot.offsetHeight);
+            }
+
+            function stopResize() {
+                document.removeEventListener('mousemove', resize);
+                document.removeEventListener('mouseup', stopResize);
+            }
+        });
+    }
+
+    // Function to send live dimensions
+    function sendLiveDimensions(width, height) {
+
+        // Example: Send data to server
+       
+        const data = {
+            width: width,
+            height: height
+        };
+        window.parent.postMessage({ liveDimentions: data }, '*');
+    }
+
+    // Reset the chatbot to its original size
+    function resetToOriginalSize() {
+        chatbot.style.width = `${initialWidth}px`;
+        chatbot.style.height = `${initialHeight}px`;
+        chatbot.style.left = ''; // Clear left style
+        chatbot.style.right = '35px'; // Reset right position
+        chatbot.style.bottom = '90px'; // Reset bottom position
+    }
+
+  </script>
+</body>
+
+</html>
